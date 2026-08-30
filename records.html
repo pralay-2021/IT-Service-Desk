@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>রেকর্ড ও Excel Export — IT Service Desk</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="badge">IT</div>
+      <div>
+        <div class="name">Service Desk</div>
+        <div class="sub">Entry &amp; Repair Log</div>
+      </div>
+    </div>
+    <nav class="nav-group">
+      <a class="nav-link" href="dashboard.html"><span class="dot"></span> ড্যাশবোর্ড</a>
+      <a class="nav-link" href="product-entry.html"><span class="dot"></span> IT Product Entry</a>
+      <a class="nav-link" href="repair-entry.html"><span class="dot"></span> IT Repairing Entry</a>
+      <a class="nav-link active" href="records.html"><span class="dot"></span> রেকর্ড ও Excel Export</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="av" id="avInit">?</div>
+        <div>
+          <div id="userName">—</div>
+          <div class="mono" id="repoName" style="font-size:11px;color:#8992A0;">—</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="logoutBtn" style="width:100%;justify-content:center;">লগআউট</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <div class="eyebrow">Records</div>
+      <h1>সব রেকর্ড</h1>
+      <p>GitHub রিপো থেকে সরাসরি পড়া তথ্য। প্রয়োজনে Excel ফাইলে এক্সপোর্ট করুন।</p>
+    </div>
+
+    <div class="table-toolbar">
+      <div class="pill-tabs">
+        <button class="pill-tab active" data-tab="repairs">🛠️ Repairing (<span id="countRepairs">0</span>)</button>
+        <button class="pill-tab" data-tab="products">📦 Products (<span id="countProducts">0</span>)</button>
+      </div>
+      <div class="spacer"></div>
+      <input class="search-input" id="searchBox" type="text" placeholder="খুঁজুন — নাম, ডিভাইস, সমস্যা…">
+      <button class="btn btn-ghost" id="refreshBtn">🔄 রিফ্রেশ</button>
+      <button class="btn btn-accent" id="exportBtn">⬇ Excel এ Export করুন</button>
+    </div>
+
+    <div id="listWrap" class="ticket-list"></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+<script>
+  const cfg = IT.requireAuth();
+  if (cfg) {
+    document.getElementById("userName").textContent = cfg.name || cfg.owner;
+    document.getElementById("repoName").textContent = `${cfg.owner}/${cfg.repo}`;
+    document.getElementById("avInit").textContent = (cfg.name || cfg.owner).slice(0,1).toUpperCase();
+  }
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    IT.clearConfig();
+    window.location.href = "index.html";
+  });
+
+  const PATHS = { repairs: "data/repairs.json", products: "data/products.json" };
+  let activeTab = "repairs";
+  let cache = { repairs: [], products: [] };
+
+  const listWrap = document.getElementById("listWrap");
+  const searchBox = document.getElementById("searchBox");
+
+  function renderEmpty(msg) {
+    listWrap.innerHTML = `<div class="empty-state"><div class="icon">🗂️</div><div>${msg}</div></div>`;
+  }
+
+  function renderRepairs(rows) {
+    if (!rows.length) return renderEmpty("এখনো কোনো রিপেয়ার টিকেট নেই।");
+    listWrap.innerHTML = rows.slice().reverse().map(r => `
+      <div class="ticket">
+        <div class="ticket-main">
+          <div class="ticket-top">
+            <span class="ticket-no">${IT.escapeHtml(r.ticketNo)}</span>
+            <span class="ticket-kind">Repair</span>
+            <span class="ticket-date mono">${IT.escapeHtml(r.date)}</span>
+          </div>
+          <div class="ticket-name">${IT.escapeHtml(r.name)}</div>
+          <div class="ticket-device">${IT.escapeHtml(r.deviceName)}</div>
+          <div class="ticket-problem">${IT.escapeHtml(r.problem)}</div>
+          ${r.remarks ? `<div class="ticket-remarks">${IT.escapeHtml(r.remarks)}</div>` : ""}
+        </div>
+        <div class="ticket-stub"><span class="stamp">SERVICE DESK</span></div>
+      </div>
+    `).join("");
+  }
+
+  function renderProducts(rows) {
+    if (!rows.length) return renderEmpty("এখনো কোনো পণ্যের এন্ট্রি নেই।");
+    listWrap.innerHTML = rows.slice().reverse().map(r => `
+      <div class="ticket">
+        <div class="ticket-main">
+          <div class="ticket-top">
+            <span class="ticket-no">${IT.escapeHtml(r.productNo)}</span>
+            <span class="ticket-kind">Product</span>
+            <span class="ticket-date mono">${IT.escapeHtml(r.date)}</span>
+          </div>
+          <div class="ticket-name">${IT.escapeHtml(r.productName)} <span style="color:var(--ink-faint); font-weight:400;">× ${IT.escapeHtml(r.quantity)}</span></div>
+          <div class="ticket-device">${IT.escapeHtml(r.category)}${r.location ? " · " + IT.escapeHtml(r.location) : ""}</div>
+          ${r.remarks ? `<div class="ticket-remarks">${IT.escapeHtml(r.remarks)}</div>` : ""}
+        </div>
+        <div class="ticket-stub"><span class="stamp">INVENTORY</span></div>
+      </div>
+    `).join("");
+  }
+
+  function currentFiltered() {
+    const q = searchBox.value.trim().toLowerCase();
+    const rows = cache[activeTab] || [];
+    if (!q) return rows;
+    return rows.filter(r => Object.values(r).join(" ").toLowerCase().includes(q));
+  }
+
+  function render() {
+    const rows = currentFiltered();
+    if (activeTab === "repairs") renderRepairs(rows); else renderProducts(rows);
+  }
+
+  async function loadAll() {
+    renderEmpty("লোড হচ্ছে…");
+    try {
+      const [repairs, products] = await Promise.all([
+        IT.loadRecords(cfg, PATHS.repairs),
+        IT.loadRecords(cfg, PATHS.products)
+      ]);
+      cache.repairs = repairs;
+      cache.products = products;
+      document.getElementById("countRepairs").textContent = repairs.length;
+      document.getElementById("countProducts").textContent = products.length;
+      render();
+    } catch (err) {
+      renderEmpty("ডেটা লোড করা যায়নি: " + (err.message || ""));
+    }
+  }
+
+  document.querySelectorAll(".pill-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".pill-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeTab = btn.dataset.tab;
+      render();
+    });
+  });
+
+  searchBox.addEventListener("input", render);
+  document.getElementById("refreshBtn").addEventListener("click", loadAll);
+
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const rows = currentFiltered();
+    if (!rows.length) { alert("এক্সপোর্ট করার মতো কোনো ডেটা নেই।"); return; }
+    if (activeTab === "repairs") {
+      IT.exportToExcel(rows, [
+        { key: "ticketNo", label: "Ticket No" },
+        { key: "date", label: "Date" },
+        { key: "name", label: "Name" },
+        { key: "deviceName", label: "Device Name" },
+        { key: "problem", label: "Problem" },
+        { key: "remarks", label: "Remarks" },
+        { key: "enteredBy", label: "Entered By" }
+      ], `repairing-entries-${IT.todayStr()}.xlsx`);
+    } else {
+      IT.exportToExcel(rows, [
+        { key: "productNo", label: "Product ID" },
+        { key: "date", label: "Date" },
+        { key: "productName", label: "Product Name" },
+        { key: "category", label: "Category" },
+        { key: "quantity", label: "Quantity" },
+        { key: "location", label: "Location" },
+        { key: "remarks", label: "Remarks" },
+        { key: "enteredBy", label: "Entered By" }
+      ], `product-entries-${IT.todayStr()}.xlsx`);
+    }
+  });
+
+  loadAll();
+</script>
+</body>
+</html>

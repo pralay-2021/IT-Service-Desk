@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>লগইন — IT Service Desk</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="centered-shell">
+  <div class="card login-card card-pad">
+    <div class="login-head">
+      <div class="badge-lg"><span>IT</span></div>
+      <h1>IT Service Desk</h1>
+      <p>আপনার GitHub রিপোজিটরির সাথে সংযুক্ত হয়ে লগইন করুন। সব ডেটা সরাসরি আপনার GitHub রিপোতে সংরক্ষিত হবে।</p>
+    </div>
+
+    <form id="loginForm">
+      <div class="field" style="margin-bottom:14px;">
+        <label for="name">আপনার নাম</label>
+        <input id="name" type="text" placeholder="যেমন: রাকিব হাসান" required>
+      </div>
+
+      <div class="divider-label">GitHub সংযোগ</div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label for="owner">GitHub Username / Organization</label>
+        <input id="owner" class="mono" type="text" placeholder="e.g. rakib-hasan" required>
+      </div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label for="repo">Repository নাম</label>
+        <input id="repo" class="mono" type="text" placeholder="e.g. it-service-desk" required>
+      </div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label for="branch">Branch</label>
+        <input id="branch" class="mono" type="text" value="main">
+      </div>
+
+      <div class="field" style="margin-bottom:18px;">
+        <label for="token">Personal Access Token</label>
+        <input id="token" class="mono" type="password" placeholder="ghp_xxxxxxxxxxxx" required>
+        <span class="hint">Repo-তে read/write অনুমতি (fine-grained → Contents: Read and write) সহ একটি টোকেন লাগবে। টোকেন শুধু আপনার ব্রাউজারে সংরক্ষিত হয়, কোথাও পাঠানো হয় না — সরাসরি GitHub API-তে যায়।</span>
+      </div>
+
+      <div id="statusMsg" class="status-msg" style="margin-bottom:14px;"></div>
+
+      <button type="submit" id="loginBtn" class="btn btn-accent" style="width:100%; justify-content:center;">সংযুক্ত করে লগইন করুন</button>
+    </form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  // If already configured, skip straight to dashboard.
+  if (IT.getConfig()) window.location.href = "dashboard.html";
+
+  const form = document.getElementById("loginForm");
+  const statusMsg = document.getElementById("statusMsg");
+  const loginBtn = document.getElementById("loginBtn");
+
+  function setStatus(text, kind) {
+    statusMsg.textContent = text;
+    statusMsg.className = "status-msg show " + kind;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const cfg = {
+      name: document.getElementById("name").value.trim(),
+      owner: document.getElementById("owner").value.trim(),
+      repo: document.getElementById("repo").value.trim(),
+      branch: document.getElementById("branch").value.trim() || "main",
+      token: document.getElementById("token").value.trim()
+    };
+
+    loginBtn.disabled = true;
+    setStatus("GitHub-এর সাথে সংযোগ পরীক্ষা করা হচ্ছে…", "pending");
+
+    try {
+      await IT.testConnection(cfg);
+      IT.setConfig(cfg);
+      setStatus("সংযোগ সফল! ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে…", "ok");
+      setTimeout(() => window.location.href = "dashboard.html", 500);
+    } catch (err) {
+      setStatus(err.message || "সংযোগ ব্যর্থ হয়েছে।", "err");
+      loginBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

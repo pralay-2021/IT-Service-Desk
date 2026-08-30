@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ড্যাশবোর্ড — IT Service Desk</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="badge">IT</div>
+      <div>
+        <div class="name">Service Desk</div>
+        <div class="sub">Entry &amp; Repair Log</div>
+      </div>
+    </div>
+    <nav class="nav-group">
+      <a class="nav-link active" href="dashboard.html"><span class="dot"></span> ড্যাশবোর্ড</a>
+      <a class="nav-link" href="product-entry.html"><span class="dot"></span> IT Product Entry</a>
+      <a class="nav-link" href="repair-entry.html"><span class="dot"></span> IT Repairing Entry</a>
+      <a class="nav-link" href="records.html"><span class="dot"></span> রেকর্ড ও Excel Export</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="av" id="avInit">?</div>
+        <div>
+          <div id="userName">—</div>
+          <div class="mono" id="repoName" style="font-size:11px;color:#8992A0;">—</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="logoutBtn" style="width:100%;justify-content:center;">লগআউট</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <div class="eyebrow">Dashboard</div>
+      <h1>স্বাগতম, <span id="welcomeName">—</span></h1>
+      <p>নিচের যেকোনো একটি ফর্ম বেছে নিন। সব এন্ট্রি সরাসরি আপনার GitHub রিপোজিটরিতে সংরক্ষিত হয়।</p>
+    </div>
+
+    <div class="menu-grid">
+      <a class="menu-card type-product" href="product-entry.html">
+        <div class="icon">📦</div>
+        <h3>IT Product Entry</h3>
+        <p>নতুন IT পণ্য / যন্ত্রাংশ ইনভেন্টরিতে যোগ করুন — নাম, ক্যাটাগরি, পরিমাণ ও অবস্থান।</p>
+        <span class="go">এন্ট্রি করুন →</span>
+      </a>
+      <a class="menu-card type-repair" href="repair-entry.html">
+        <div class="icon">🛠️</div>
+        <h3>IT Repairing Product Entry</h3>
+        <p>মেরামতের জন্য জমা হওয়া ডিভাইসের টিকেট খুলুন — Ticket No, তারিখ, সমস্যা ও মন্তব্য সহ।</p>
+        <span class="go">টিকেট খুলুন →</span>
+      </a>
+      <a class="menu-card" href="records.html" style="border-color:var(--line);">
+        <div class="icon" style="background:var(--surface-2);color:var(--ink-soft);">📊</div>
+        <h3>রেকর্ড দেখুন / Excel Export</h3>
+        <p>সব এন্ট্রি এক জায়গায় দেখুন এবং এক ক্লিকে Excel (.xlsx) ফাইলে এক্সপোর্ট করুন।</p>
+        <span class="go" style="color:var(--ink-soft);">দেখুন →</span>
+      </a>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  const cfg = IT.requireAuth();
+  if (cfg) {
+    document.getElementById("welcomeName").textContent = cfg.name || cfg.owner;
+    document.getElementById("userName").textContent = cfg.name || cfg.owner;
+    document.getElementById("repoName").textContent = `${cfg.owner}/${cfg.repo}`;
+    document.getElementById("avInit").textContent = (cfg.name || cfg.owner).slice(0,1).toUpperCase();
+  }
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    IT.clearConfig();
+    window.location.href = "index.html";
+  });
+</script>
+</body>
+</html>

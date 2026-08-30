@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IT Repairing Entry — IT Service Desk</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="badge">IT</div>
+      <div>
+        <div class="name">Service Desk</div>
+        <div class="sub">Entry &amp; Repair Log</div>
+      </div>
+    </div>
+    <nav class="nav-group">
+      <a class="nav-link" href="dashboard.html"><span class="dot"></span> ড্যাশবোর্ড</a>
+      <a class="nav-link" href="product-entry.html"><span class="dot"></span> IT Product Entry</a>
+      <a class="nav-link active" href="repair-entry.html"><span class="dot"></span> IT Repairing Entry</a>
+      <a class="nav-link" href="records.html"><span class="dot"></span> রেকর্ড ও Excel Export</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="av" id="avInit">?</div>
+        <div>
+          <div id="userName">—</div>
+          <div class="mono" id="repoName" style="font-size:11px;color:#8992A0;">—</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="logoutBtn" style="width:100%;justify-content:center;">লগআউট</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <div class="eyebrow">Repairing Entry</div>
+      <h1>IT Repairing Product Entry</h1>
+      <p>মেরামতের জন্য জমা হওয়া ডিভাইসের টিকেট খুলুন। জমা দিলে সরাসরি <span class="mono">data/repairs.json</span>-এ কমিট হবে।</p>
+    </div>
+
+    <div class="card card-pad" style="max-width:720px;">
+      <form id="repairForm">
+        <div class="form-grid">
+          <div class="field">
+            <label for="ticketNo">Ticket No.</label>
+            <input id="ticketNo" class="mono" type="text" readonly>
+            <span class="hint">স্বয়ংক্রিয়ভাবে তৈরি হয়েছে</span>
+          </div>
+          <div class="field">
+            <label for="date">Date</label>
+            <input id="date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" type="text" placeholder="যিনি ডিভাইস জমা দিয়েছেন" required>
+          </div>
+          <div class="field">
+            <label for="deviceName">Device Name</label>
+            <input id="deviceName" type="text" placeholder="যেমন: HP LaserJet Printer" required>
+          </div>
+          <div class="field full">
+            <label for="problem">Problem</label>
+            <textarea id="problem" placeholder="সমস্যার বিবরণ লিখুন" required></textarea>
+          </div>
+          <div class="field full">
+            <label for="remarks">Remarks</label>
+            <textarea id="remarks" placeholder="অতিরিক্ত মন্তব্য (ঐচ্ছিক)"></textarea>
+          </div>
+        </div>
+
+        <div id="statusMsg" class="status-msg" style="margin-top:16px;"></div>
+
+        <div class="btn-row">
+          <button type="submit" id="submitBtn" class="btn btn-accent">টিকেট সংরক্ষণ করুন</button>
+          <button type="reset" class="btn btn-ghost">রিসেট</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+  const cfg = IT.requireAuth();
+  if (cfg) {
+    document.getElementById("userName").textContent = cfg.name || cfg.owner;
+    document.getElementById("repoName").textContent = `${cfg.owner}/${cfg.repo}`;
+    document.getElementById("avInit").textContent = (cfg.name || cfg.owner).slice(0,1).toUpperCase();
+  }
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    IT.clearConfig();
+    window.location.href = "index.html";
+  });
+
+  const DATA_PATH = "data/repairs.json";
+  const dateInput = document.getElementById("date");
+  const ticketNoInput = document.getElementById("ticketNo");
+  dateInput.value = IT.todayStr();
+
+  async function prefillTicket() {
+    try {
+      const existing = await IT.loadRecords(cfg, DATA_PATH);
+      ticketNoInput.value = IT.nextTicketNo(existing);
+    } catch(e) {
+      ticketNoInput.value = "TKT-" + Date.now();
+    }
+  }
+  prefillTicket();
+
+  const form = document.getElementById("repairForm");
+  const statusMsg = document.getElementById("statusMsg");
+  const submitBtn = document.getElementById("submitBtn");
+
+  function setStatus(text, kind) {
+    statusMsg.textContent = text;
+    statusMsg.className = "status-msg show " + kind;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    setStatus("GitHub-এ সংরক্ষণ করা হচ্ছে…", "pending");
+
+    const record = {
+      ticketNo: ticketNoInput.value,
+      date: dateInput.value,
+      name: document.getElementById("name").value.trim(),
+      deviceName: document.getElementById("deviceName").value.trim(),
+      problem: document.getElementById("problem").value.trim(),
+      remarks: document.getElementById("remarks").value.trim(),
+      enteredBy: cfg.name || cfg.owner,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await IT.addRecord(cfg, DATA_PATH, record, `Add repair ticket ${record.ticketNo}`);
+      setStatus("✓ টিকেট সংরক্ষিত হয়েছে (GitHub-এ কমিট হয়েছে)।", "ok");
+      form.reset();
+      dateInput.value = IT.todayStr();
+      await prefillTicket();
+    } catch (err) {
+      setStatus("ত্রুটি: " + (err.message || "সংরক্ষণ ব্যর্থ হয়েছে।"), "err");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
